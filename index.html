@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa Interactivo - Puntos de Interés</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    :root {
+      --primary: #1e40af;
+      --primary-hover: #1d4ed8;
+      --accent: #d97706;
+      --bg-dark: #0f172a;
+      --card-bg: rgba(255, 255, 255, 0.96);
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+      --text-main: #1f2937;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #f3f4f6;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    /* Map container */
+    #map {
+      flex: 1;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Floating Header */
+    .header-bar {
+      position: absolute;
+      top: 14px;
+      left: 60px;
+      z-index: 1000;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      pointer-events: auto;
+    }
+
+    .header-bar h1 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-bar .badge-count {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Sidebar drawer */
+    .sidebar {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      bottom: 14px;
+      width: 360px;
+      max-width: calc(100vw - 28px);
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      box-shadow: var(--card-shadow);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(calc(100% + 20px));
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .sidebar-close-btn {
+      background: #f3f4f6;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4b5563;
+      font-size: 1.1rem;
+      transition: background 0.2s;
+    }
+    .sidebar-close-btn:hover {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .sidebar-filter {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .category-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #f3f4f6;
+      color: #4b5563;
+      cursor: pointer;
+      border: 1px solid #e5e7eb;
+      transition: all 0.2s;
+    }
+    .chip.active {
+      background: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sidebar-card {
+      display: flex;
+      gap: 12px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 10px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    }
+    .sidebar-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-color: #93c5fd;
+    }
+    .sidebar-card.active {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+    }
+
+    .sidebar-card img {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #e5e7eb;
+      flex-shrink: 0;
+    }
+
+    .sidebar-card-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    .sidebar-card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #111827;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-card-category {
+      font-size: 0.72rem;
+      color: #4b5563;
+    }
+
+    .sidebar-card-meta {
+      font-size: 0.72rem;
+      color: #6b7280;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Floating toggle for sidebar when collapsed */
+    .sidebar-toggle-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 999;
+      background: var(--card-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--card-shadow);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #1f2937;
+    }
+    .sidebar-toggle-btn:hover {
+      background: white;
+    }
+
+    /* Map Controls UI improvements */
+    .leaflet-bar {
+      border-radius: 10px !important;
+      overflow: hidden;
+      border: none !important;
+      box-shadow: var(--card-shadow) !important;
+    }
+    .leaflet-bar a {
+      background: rgba(255, 255, 255, 0.95) !important;
+      color: #1f2937 !important;
+      border-bottom: 1px solid #f3f4f6 !important;
+    }
+    .leaflet-bar a:hover {
+      background: #f9fafb !important;
+      color: var(--primary) !important;
+    }
+
+    /* Custom layer switcher styling */
+    .leaflet-control-layers {
+      border-radius: 12px !important;
+      border: none !important;
+      box-shadow: var(--card-shadow) !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      backdrop-filter: blur(10px);
+      padding: 10px 14px !important;
+      font-size: 0.85rem;
+      color: #1f2937;
+    }
+    .leaflet-control-layers-base label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+      cursor: pointer;
+    }
+
+    /* Fit All Button */
+    .custom-map-btn {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: var(--card-shadow);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #1f2937;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      position: absolute;
+      bottom: 24px;
+      left: 14px;
+      z-index: 1000;
+      transition: all 0.2s;
+    }
+    .custom-map-btn:hover {
+      background: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    /* Custom popup */
+    .leaflet-popup-content-wrapper {
+      padding: 0 !important;
+      border-radius: 14px !important;
+      overflow: hidden;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22) !important;
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      line-height: 1.4 !important;
+      width: 290px !important;
+    }
+    .popup-card {
+      display: flex;
+      flex-direction: column;
+    }
+    .popup-img-wrapper {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      background: #111827;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .popup-img-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    .popup-img-wrapper:hover img {
+      transform: scale(1.05);
+    }
+    .popup-img-wrapper .zoom-hint {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      font-size: 0.68rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+    }
+
+    .popup-body {
+      padding: 12px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .popup-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+    .popup-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .badge-cat {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .badge-alt {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .popup-coords {
+      font-size: 0.72rem;
+      color: #6b7280;
+      background: #f9fafb;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #f3f4f6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .popup-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .popup-btn {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .popup-btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .popup-btn-primary:hover {
+      background: #1d4ed8;
+    }
+    .popup-btn-outline {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .popup-btn-outline:hover {
+      background: #e5e7eb;
+    }
+
+    /* Custom marker style */
+    .custom-marker-pin {
+      width: 34px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .custom-marker-pin:hover {
+      transform: scale(1.15) translateY(-4px);
+    }
+    .custom-marker-pin svg {
+      width: 100%;
+      height: 100%;
+    }
+    .custom-marker-pin span {
+      position: absolute;
+      top: 9px;
+      color: white;
+      font-weight: 800;
+      font-size: 11px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* Lightbox Modal */
+    .lightbox {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(8px);
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      padding: 20px;
+    }
+    .lightbox.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .lightbox-img {
+      max-width: 90vw;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .lightbox-caption {
+      color: white;
+      margin-top: 14px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      font-size: 1.8rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .lightbox-close:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header-bar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        <circle cx="12" cy="10" r="3"></circle>
+      </svg>
+      <h1>Cafayate y Valles Calchaquíes</h1>
+      <span class="badge-count" id="points-count">7 puntos</span>
+    </div>
+
+    <!-- Toggle button for collapsed sidebar -->
+    <button class="sidebar-toggle-btn" id="open-sidebar-btn" style="display:none;" title="Ver lista de puntos">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+      Ver puntos
+    </button>
+
+    <!-- Sidebar Drawer -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Puntos de Interés</h2>
+        <button class="sidebar-close-btn" id="close-sidebar-btn" title="Cerrar panel">✕</button>
+      </div>
+      <div class="sidebar-filter">
+        <input type="text" id="search-input" class="search-input" placeholder="Buscar lugar o categoría..." />
+        <div class="category-chips" id="category-chips">
+          <span class="chip active" data-cat="all">Todos</span>
+        </div>
+      </div>
+      <div class="sidebar-list" id="sidebar-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </aside>
+
+    <!-- Fit All Button -->
+    <button class="custom-map-btn" id="fit-bounds-btn" title="Centrar y ver todos los puntos">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h6v6"></path>
+        <path d="M9 21H3v-6"></path>
+        <path d="M21 3l-7 7"></path>
+        <path d="M3 21l7-7"></path>
+      </svg>
+      Ver todos los puntos
+    </button>
+
+    <!-- Map container -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Fullscreen Photo Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightbox-close">&times;</button>
+    <img class="lightbox-img" id="lightbox-img" src="" alt="" />
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // Embedded GeoJSON dataset fallback (ensures file works even when opened with file:// directly)
+    const EMBEDDED_GEOJSON = {
+      "type": "FeatureCollection",
+      "name": "amar_cafa",
+      "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4979" } },
+      "features": [
+        { "type": "Feature", "properties": { "Descripción": "Quebrada de las Conchas", "id": 1, "categoria": "Reserva Natural / Paisaje", "Altitud": 1450, "foto": "1.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.801295870358331, -26.004403702255203, 0.0 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Garganta del Diablo", "id": 2, "categoria": "Atractivo Turístico", "Altitud": 1444, "foto": "2.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.701543512607827, -25.848815124557255, 1444.0 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Anfiteatro", "id": 3, "categoria": "Atractivo Turístico", "Altitud": 1454, "foto": "3.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.701312, -25.8553168, 1454.0 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Plaza Cafayate", "id": 4, "categoria": "Espacio Público", "Altitud": 1683, "foto": "4.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.975989404307214, -26.073025121686051, 0.0 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Ludere College", "id": 5, "categoria": "Institución Educativa", "Altitud": 1187, "foto": "5.png" }, "geometry": { "type": "Point", "coordinates": [ -65.461280708133515, -24.840052427334225, 0.0 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Colegio Técnica 3142", "id": 6, "categoria": "Institución Educativa", "Altitud": 1667, "foto": "6.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.9770208, -26.0765158, 1667.5999755859375 ] } },
+        { "type": "Feature", "properties": { "Descripción": "Burbujas de altura", "id": 7, "categoria": "Enoturismo / Bodega", "Altitud": 1706, "foto": "7.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.980537, -26.0355252, 1706.0 ] } }
+      ]
+    };
+
+    // Mapping photos by ID in case properties don't explicitly contain the filename
+    const PHOTO_MAP = {
+      1: "1.jpeg",
+      2: "2.jpeg",
+      3: "3.jpg",
+      4: "4.jpeg",
+      5: "5.png",
+      6: "6.jpg",
+      7: "7.jpg"
+    };
+
+    // Color palette per category
+    const CATEGORY_COLORS = {
+      "Reserva Natural / Paisaje": "#059669", // emerald
+      "Atractivo Turístico": "#dc2626",      // red
+      "Espacio Público": "#2563eb",          // blue
+      "Institución Educativa": "#7c3aed",    // purple
+      "Enoturismo / Bodega": "#d97706"       // amber
+    };
+
+    function getColorForCategory(cat) {
+      return CATEGORY_COLORS[cat] || "#2563eb";
+    }
+
+    // SVG Pin Marker generator
+    function createCustomMarkerIcon(id, category) {
+      const color = getColorForCategory(category);
+      const svg = `
+        <svg viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 0C7.61 0 0 7.61 0 17C0 28.5 17 44 17 44C17 44 34 28.5 34 17C34 7.61 26.39 0 17 0Z" fill="${color}"/>
+          <circle cx="17" cy="16" r="10" fill="white" opacity="0.3"/>
+          <circle cx="17" cy="16" r="8" fill="white" opacity="0.95"/>
+        </svg>
+      `;
+      return L.divIcon({
+        className: 'custom-marker-wrapper',
+        html: `
+          <div class="custom-marker-pin" title="ID: ${id}">
+            ${svg}
+            <span style="color: ${color};">${id}</span>
+          </div>
+        `,
+        iconSize: [34, 44],
+        iconAnchor: [17, 44],
+        popupAnchor: [0, -42]
+      });
+    }
+
+    // Initial Map Setup
+    const map = L.map('map', {
+      center: [-25.9, -65.8],
+      zoom: 10,
+      zoomControl: false
+    });
+
+    // Move zoom control to top-left below header
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    // Scale bar
+    L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+
+    // ==========================================
+    // BASE LAYERS
+    // ==========================================
+
+    // 1. Argenmap (IGN Argentina base layer)
+    const argenmap = L.tileLayer(
+      'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png',
+      {
+        attribution: '&copy; <a href="https://www.ign.gob.ar" target="_blank">IGN Argentina</a> + <a href="https://www.openstreetmap.org" target="_blank">OSM</a>',
+        minZoom: 3,
+        maxZoom: 19
+      }
+    );
+
+    // 2. Google Satélite
+    const googleSatellite = L.tileLayer(
+      'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      {
+        attribution: '&copy; Google Maps Satélite',
+        maxZoom: 20
+      }
+    );
+
+    // 3. Google Híbrido (Satélite con etiquetas de calles y lugares)
+    const googleHybrid = L.tileLayer(
+      'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+      {
+        attribution: '&copy; Google Maps Híbrido',
+        maxZoom: 20
+      }
+    );
+
+    // 4. Argenmap Topográfico (Extra IGN layer)
+    const argenmapTopo = L.tileLayer(
+      'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/mapabase_topo@EPSG%3A3857@png/{z}/{x}/{-y}.png',
+      {
+        attribution: '&copy; <a href="https://www.ign.gob.ar" target="_blank">IGN Topográfico</a>',
+        minZoom: 3,
+        maxZoom: 19
+      }
+    );
+
+    // Add default base layer (Argenmap)
+    argenmap.addTo(map);
+
+    const baseMaps = {
+      "🇦🇷 Argenmap (IGN)": argenmap,
+      "🛰️ Google Satélite": googleSatellite,
+      "🗺️ Google Híbrido": googleHybrid,
+      "⛰️ Argenmap Topográfico": argenmapTopo
+    };
+
+    // Layer group for GeoJSON markers
+    const markersLayer = L.featureGroup().addTo(map);
+
+    const overlayMaps = {
+      "📍 Puntos de Interés": markersLayer
+    };
+
+    // Add Layer Control
+    L.control.layers(baseMaps, overlayMaps, {
+      position: 'topleft',
+      collapsed: false
+    }).addTo(map);
+
+    // ==========================================
+    // DATA HANDLING & MARKERS
+    // ==========================================
+    let featuresData = [];
+    const markerById = {};
+
+    function getPhotoUrl(feature) {
+      if (feature.properties.foto) return feature.properties.foto;
+      if (feature.properties.imagen) return feature.properties.imagen;
+      const id = feature.properties.id;
+      if (PHOTO_MAP[id]) return PHOTO_MAP[id];
+      return `${id}.jpg`;
+    }
+
+    function createPopupContent(feature) {
+      const p = feature.properties;
+      const coords = feature.geometry.coordinates; // [lng, lat, alt]
+      const lng = coords[0].toFixed(5);
+      const lat = coords[1].toFixed(5);
+      const alt = p.Altitud ? `${p.Altitud} msnm` : (coords[2] ? `${coords[2]} msnm` : 'N/D');
+      const photoUrl = getPhotoUrl(feature);
+      const gmapsLink = `https://www.google.com/maps/dir/?api=1&destination=${coords[1]},${coords[0]}`;
+
+      return `
+        <div class="popup-card">
+          <div class="popup-img-wrapper" onclick="openLightbox('${photoUrl}', '${encodeURIComponent(p.Descripción)}')">
+            <img src="${photoUrl}" alt="${p.Descripción}" onerror="this.onerror=null;this.src='https://via.placeholder.com/300x160?text=Foto+No+Disponible';" />
+            <span class="zoom-hint">🔍 Clic para ampliar</span>
+          </div>
+          <div class="popup-body">
+            <h3 class="popup-title">${p.Descripción}</h3>
+            <div class="popup-badges">
+              <span class="badge badge-cat">${p.categoria || 'Punto de Interés'}</span>
+              <span class="badge badge-alt">⛰️ ${alt}</span>
+            </div>
+            <div class="popup-coords">
+              <span>📍 Lat: ${lat}, Lng: ${lng}</span>
+            </div>
+            <div class="popup-actions">
+              <a href="${gmapsLink}" target="_blank" rel="noopener noreferrer" class="popup-btn popup-btn-primary">
+                🚗 Cómo llegar
+              </a>
+              <button onclick="openLightbox('${photoUrl}', '${encodeURIComponent(p.Descripción)}')" class="popup-btn popup-btn-outline">
+                🖼️ Ver foto completa
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPoints(data) {
+      markersLayer.clearLayers();
+      featuresData = data.features;
+      document.getElementById('points-count').innerText = `${featuresData.length} puntos`;
+
+      // Collect categories for filter
+      const categories = new Set();
+
+      featuresData.forEach(feature => {
+        const coords = feature.geometry.coordinates;
+        const lat = coords[1];
+        const lng = coords[0];
+        const p = feature.properties;
+        if (p.categoria) categories.add(p.categoria);
+
+        const marker = L.marker([lat, lng], {
+          icon: createCustomMarkerIcon(p.id, p.categoria)
+        });
+
+        marker.bindPopup(createPopupContent(feature), {
+          maxWidth: 320,
+          className: 'custom-leaflet-popup'
+        });
+
+        marker.on('click', () => {
+          highlightSidebarCard(p.id);
+        });
+
+        markersLayer.addLayer(marker);
+        markerById[p.id] = marker;
+      });
+
+      // Fit map to markers bounds
+      if (featuresData.length > 0) {
+        map.fitBounds(markersLayer.getBounds(), { padding: [60, 60] });
+      }
+
+      // Build category filters
+      renderCategoryChips(Array.from(categories));
+
+      // Build sidebar cards
+      renderSidebarList(featuresData);
+    }
+
+    function renderCategoryChips(categories) {
+      const container = document.getElementById('category-chips');
+      container.innerHTML = '<span class="chip active" data-cat="all">Todos</span>';
+
+      categories.forEach(cat => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.dataset.cat = cat;
+        chip.innerText = cat;
+        container.appendChild(chip);
+      });
+
+      // Event listener for chips
+      container.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          container.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          filterPoints();
+        });
+      });
+    }
+
+    function renderSidebarList(features) {
+      const listEl = document.getElementById('sidebar-list');
+      listEl.innerHTML = '';
+
+      if (features.length === 0) {
+        listEl.innerHTML = '<p style="padding: 16px; text-align: center; color: #9ca3af; font-size: 0.85rem;">No se encontraron lugares.</p>';
+        return;
+      }
+
+      features.forEach(feature => {
+        const p = feature.properties;
+        const coords = feature.geometry.coordinates;
+        const alt = p.Altitud ? `${p.Altitud} msnm` : '';
+        const photoUrl = getPhotoUrl(feature);
+
+        const card = document.createElement('div');
+        card.className = 'sidebar-card';
+        card.id = `card-${p.id}`;
+        card.innerHTML = `
+          <img src="${photoUrl}" alt="${p.Descripción}" onerror="this.onerror=null;this.src='https://via.placeholder.com/72?text=Foto';" />
+          <div class="sidebar-card-info">
+            <div class="sidebar-card-title">${p.id}. ${p.Descripción}</div>
+            <div class="sidebar-card-category" style="color: ${getColorForCategory(p.categoria)}; font-weight: 600;">
+              ${p.categoria}
+            </div>
+            <div class="sidebar-card-meta">
+              ${alt ? `<span>⛰️ ${alt}</span>` : ''}
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          focusPoint(p.id, coords[1], coords[0]);
+        });
+
+        listEl.appendChild(card);
+      });
+    }
+
+    function focusPoint(id, lat, lng) {
+      highlightSidebarCard(id);
+      map.flyTo([lat, lng], 14, {
+        duration: 1.2
+      });
+      const marker = markerById[id];
+      if (marker) {
+        setTimeout(() => {
+          marker.openPopup();
+        }, 800);
+      }
+    }
+
+    function highlightSidebarCard(id) {
+      document.querySelectorAll('.sidebar-card').forEach(c => c.classList.remove('active'));
+      const activeCard = document.getElementById(`card-${id}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function filterPoints() {
+      const activeChip = document.querySelector('.chip.active');
+      const selectedCategory = activeChip ? activeChip.dataset.cat : 'all';
+      const searchText = document.getElementById('search-input').value.toLowerCase().trim();
+
+      const filtered = featuresData.filter(feature => {
+        const p = feature.properties;
+        const matchesCategory = (selectedCategory === 'all' || p.categoria === selectedCategory);
+        const matchesSearch = !searchText ||
+          p.Descripción.toLowerCase().includes(searchText) ||
+          (p.categoria && p.categoria.toLowerCase().includes(searchText));
+        return matchesCategory && matchesSearch;
+      });
+
+      renderSidebarList(filtered);
+
+      // Show/hide markers accordingly
+      markersLayer.clearLayers();
+      filtered.forEach(feature => {
+        const id = feature.properties.id;
+        if (markerById[id]) {
+          markersLayer.addLayer(markerById[id]);
+        }
+      });
+    }
+
+    // Search input listener
+    document.getElementById('search-input').addEventListener('input', filterPoints);
+
+    // Sidebar controls
+    const sidebar = document.getElementById('sidebar');
+    const openSidebarBtn = document.getElementById('open-sidebar-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+
+    closeSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.add('collapsed');
+      openSidebarBtn.style.display = 'flex';
+    });
+
+    openSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.remove('collapsed');
+      openSidebarBtn.style.display = 'none';
+    });
+
+    // Fit all points button
+    document.getElementById('fit-bounds-btn').addEventListener('click', () => {
+      if (markersLayer.getLayers().length > 0) {
+        map.fitBounds(markersLayer.getBounds(), { padding: [50, 50] });
+      }
+    });
+
+    // Lightbox modal logic
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    window.openLightbox = function(url, caption) {
+      lightboxImg.src = url;
+      lightboxCaption.innerText = decodeURIComponent(caption);
+      lightbox.classList.add('active');
+    };
+
+    lightboxClose.addEventListener('click', () => {
+      lightbox.classList.remove('active');
+    });
+
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) {
+        lightbox.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+        lightbox.classList.remove('active');
+      }
+    });
+
+    // Load GeoJSON data: Try fetch('amar_cafa.geojson'), fallback to EMBEDDED_GEOJSON
+    fetch('amar_cafa.geojson')
+      .then(response => {
+        if (!response.ok) throw new Error('No se pudo cargar el archivo vía fetch');
+        return response.json();
+      })
+      .then(data => {
+        console.log('GeoJSON cargado exitosamente desde amar_cafa.geojson');
+        renderPoints(data);
+      })
+      .catch(err => {
+        console.warn('Cargando datos embebidos de respaldo (modo local sin servidor HTTP):', err);
+        renderPoints(EMBEDDED_GEOJSON);
+      });
+  </script>
+</body>
+</html>

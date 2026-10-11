@@ -1,0 +1,14 @@
+{
+"type": "FeatureCollection",
+"name": "amar_cafa",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4979" } },
+"features": [
+{ "type": "Feature", "properties": { "Descripción": "Quebrada de las Conchas", "id": 1, "categoria": "Reserva Natural / Paisaje", "Altitud": 1450, "foto": "1.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.801295870358331, -26.004403702255203, 0.0 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Garganta del Diablo", "id": 2, "categoria": "Atractivo Turístico", "Altitud": 1444, "foto": "2.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.701543512607827, -25.848815124557255, 1444.0 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Anfiteatro", "id": 3, "categoria": "Atractivo Turístico", "Altitud": 1454, "foto": "3.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.701312, -25.8553168, 1454.0 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Plaza Cafayate", "id": 4, "categoria": "Espacio Público", "Altitud": 1683, "foto": "4.jpeg" }, "geometry": { "type": "Point", "coordinates": [ -65.975989404307214, -26.073025121686051, 0.0 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Ludere College", "id": 5, "categoria": "Institución Educativa", "Altitud": 1187, "foto": "5.png" }, "geometry": { "type": "Point", "coordinates": [ -65.461280708133515, -24.840052427334225, 0.0 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Colegio Técnica 3142", "id": 6, "categoria": "Institución Educativa", "Altitud": 1667, "foto": "6.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.9770208, -26.0765158, 1667.5999755859375 ] } },
+{ "type": "Feature", "properties": { "Descripción": "Burbujas de altura", "id": 7, "categoria": "Enoturismo / Bodega", "Altitud": 1706, "foto": "7.jpg" }, "geometry": { "type": "Point", "coordinates": [ -65.980537, -26.0355252, 1706.0 ] } }
+]
+}
